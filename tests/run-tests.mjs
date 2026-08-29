@@ -43,7 +43,7 @@ const S = vm.runInContext(`({
   currentCycleId, waterCycles, cycleSummary, trendDirection, floaterAdvice,
   detectPatterns, bromineMetrics, balanceScore, testingConsistency,
   computeDose, findChemical, maintenanceStatus, cloudyWaterAdvice,
-  freshFillBalanceStep
+  freshFillBalanceStep, finalTestOutcome, tooltipHtml
 })`, sandbox);
 
 /* ---------------- tiny test runner ---------------- */
@@ -407,6 +407,30 @@ test("Fresh-fill bromine step never says 'add granules' when bromine is high", (
   vm.runInContext("state = " + JSON.stringify(st2), sandbox);
   const lowHtml = vm.runInContext('freshFillBalanceStep("bromine", new Date("2026-08-29T12:00:00"))', sandbox);
   ok(/I ADDED BROMINE GRANULES/.test(lowHtml), "low bromine offers granules");
+});
+
+test("canWeUseIt: borderline bromine range never yields YES — retest first", () => {
+  const st = freshState();
+  addTest(st, "2026-08-29T09:00:00", { bromine: range(2, 5), pH: val(7.2) });
+  const r = S.canWeUseIt(st, NOW);
+  eq(r.verdict, "TEST_FIRST", "ambiguous sanitizer read must force a retest");
+});
+
+test("Fresh-fill final verification: completes only when all readings pass", () => {
+  const T = S.SPA_TARGETS;
+  eq(S.finalTestOutcome({ bromine: val(5), pH: val(7.2), alkalinity: val(80), hardness: val(250, true) }, T),
+     "complete", "all-green final test completes setup");
+  eq(S.finalTestOutcome({ bromine: val(1), pH: val(7.2), alkalinity: val(80), hardness: val(250, true) }, T),
+     "bromine", "low bromine returns to the bromine step");
+  eq(S.finalTestOutcome({ bromine: val(5), pH: val(8.4), alkalinity: val(40), hardness: val(250, true) }, T),
+     "alkalinity", "alkalinity outranks pH when both fail");
+});
+
+test("Chart tooltip escapes user-controlled event text (no XSS)", () => {
+  const html = S.tooltipHtml({ when: "Aug 29", param: "Bromine", value: "5 ppm", status: "Ideal",
+    context: "normal", age: "3 days", prev: 'Added <img src=x onerror=alert(1)> "chem"' });
+  ok(!html.includes("<img"), "raw tag must not survive");
+  ok(html.includes("&lt;img"), "tag is HTML-escaped");
 });
 
 test("Shock cadence: due after 7 days, tracked from event", () => {

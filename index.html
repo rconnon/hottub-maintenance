@@ -743,6 +743,11 @@ function canWeUseIt(state, now) {
   if (blocking) {
     return { verdict: "NOT_YET", reason: blocking.message || blocking.title, action: blocking };
   }
+  // A borderline sanitizer read (range crossing the target boundary) is
+  // not proof of a safe residual — never answer YES from it.
+  if (actions.some(a => a.parameter === "bromine" && a.retestOnly)) {
+    return { verdict: "TEST_FIRST", reason: "The last bromine read was between two colors across the target boundary. Retest before using the spa." };
+  }
   // Water clarity from the latest test's observations.
   const obs = lastTest.data.observations;
   if (obs && obs.appearance === "very cloudy") {
@@ -1794,9 +1799,24 @@ function maybeAdvanceAfterRetest(param) {
       interpretBromine(r.value, state.targets).status === "green") { /* stays; UI shows established + floater form */ }
 }
 
+// Decide where the wizard goes after the final verification test:
+// "complete" only when every reading is acceptable; otherwise back to
+// the earliest failing balance step (alkalinity → pH → hardness → bromine).
+function finalTestOutcome(values, targets) {
+  const actions = diagnose(values, targets, "fresh_fill");
+  if (actions.length === 0) return "complete";
+  const stepFor = { alkalinity: "alkalinity", pH: "ph", hardness: "hardness", bromine: "bromine" };
+  const first = ["alkalinity", "pH", "hardness", "bromine"].find(p => actions.some(a => a.parameter === p));
+  return stepFor[first] || "final_test";
+}
+
 function ffFinalTest() {
   startTest("full", null, "fresh_fill", function (ev) {
-    setStartupState("complete");
+    const next = finalTestOutcome(ev.data.values, state.targets);
+    setStartupState(next);
+    if (next !== "complete") {
+      alert2("Final check found " + STARTUP_STEP_LABELS[next].toLowerCase() + " out of range — returning to that step.");
+    }
     ui.route = "freshfill";
     render();
   });
@@ -2016,6 +2036,15 @@ function tooltipData(param, p, now) {
   return esc(JSON.stringify(obj));
 }
 
+// Tooltip fields round-trip through JSON.parse, so they arrive unescaped
+// and can carry user-entered text (e.g. a configured chemical name inside
+// the previous-event line). Escape every field before innerHTML insertion.
+function tooltipHtml(d) {
+  return "<b>" + esc(d.when) + "</b><br>" + esc(d.param) + ": <b>" + esc(d.value) + "</b> — " + esc(d.status) +
+    "<br>Context: " + esc(d.context) + (d.age ? "<br>Water age: " + esc(d.age) : "") +
+    (d.prev ? "<br><span class='muted'>Previous event: " + esc(d.prev) + "</span>" : "");
+}
+
 function bindCharts() {
   // One-time delegated handler for chart tooltips.
   if (bindCharts._done) return;
@@ -2025,9 +2054,7 @@ function bindCharts() {
     const el = e.target.closest && e.target.closest("[data-tip]");
     if (!el) { tip.style.display = "none"; return; }
     const d = JSON.parse(el.getAttribute("data-tip"));
-    tip.innerHTML = "<b>" + d.when + "</b><br>" + d.param + ": <b>" + d.value + "</b> — " + d.status +
-      "<br>Context: " + d.context + (d.age ? "<br>Water age: " + d.age : "") +
-      (d.prev ? "<br><span class='muted'>Previous event: " + d.prev + "</span>" : "");
+    tip.innerHTML = tooltipHtml(d);
     tip.style.display = "block";
     const r = el.getBoundingClientRect();
     tip.style.left = Math.min(window.innerWidth - 250, Math.max(8, r.left - 60)) + "px";
