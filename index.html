@@ -714,8 +714,9 @@ function diagnose(values, targets, context) {
 
 /* ---------- "Can we use it?" engine ---------- */
 function canWeUseIt(state, now) {
-  // Active fresh-fill: water is mid-setup.
-  if (state.startup.active) {
+  // Active fresh-fill: water is mid-setup. (The "complete" state has
+  // passed final verification, so it no longer blocks use.)
+  if (startupInProgress(state)) {
     return { verdict: "NOT_YET", reason: "Fresh-fill setup is in progress. Finish water setup before using the spa." };
   }
   const brFresh = paramFreshness(state, "bromine", now);
@@ -762,7 +763,7 @@ function canWeUseIt(state, now) {
 
 /* ---------- Overall Today status (GREEN/AMBER/RED/GRAY) ---------- */
 function overallStatus(state, now) {
-  if (state.startup.active) {
+  if (startupInProgress(state)) {
     return { color: "blue", title: "Fresh fill in progress", why: "Continue the water setup wizard to finish preparing the water." };
   }
   const brFresh = paramFreshness(state, "bromine", now);
@@ -1593,8 +1594,17 @@ function saveSoak() {
    ============================================================ */
 function setStartupState(s) {
   state.startup.state = s;
-  state.startup.active = s !== "complete";
+  // "complete" keeps the wizard active so the completion screen renders;
+  // only ffFinish() (START NORMAL MAINTENANCE) deactivates the wizard and
+  // records the startup_complete event.
+  state.startup.active = s != null;
   saveState(state);
+}
+
+// True while the wizard still has balance work to do. The "complete"
+// state shows a summary screen but no longer restricts spa use.
+function startupInProgress(state) {
+  return state.startup.active && state.startup.state !== "complete";
 }
 
 function freshFillProgress() {
