@@ -1657,6 +1657,15 @@ function freshFillBalanceStep(step, now) {
         '<button class="btn btn-primary" data-act="ff-advance" data-arg="final_test">CONTINUE TO FINAL TEST</button>';
       return html;
     }
+    // Overshot during establishment (10/20 ppm): sanitizer safety overrides
+    // the "add granules" flow — never tell Joel to add more (§18, Rule 4).
+    const ivHigh = r ? asInterval(r.value) : null;
+    if (ivHigh && ivHigh.lo >= 10) {
+      html += '<div class="tl-title">Bromine is high (' + formatValue("bromine", r.value) + ")</div>" +
+        '<p class="tl-detail" style="margin:8px 0"><b>Do not add more sanitizer.</b> Circulate, allow the level to fall, and retest before continuing.</p></div>' +
+        '<button class="btn btn-primary" data-act="ff-retest" data-param="bromine">RETEST BROMINE</button>';
+      return html;
+    }
     html += '<div class="tl-title">Establish sanitizer</div>' +
       '<p class="tl-detail" style="margin:8px 0">Target 3–5 ppm. The Hach strip’s ideal measurable point is 5 ppm — aim for a strip result around <b>5 ppm</b>.</p>' +
       '<div class="result-row"><span>Regal Brom Granules</span><span class="muted">fast correction — use now</span></div>' +
@@ -2336,8 +2345,10 @@ function importData(file) {
       if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.events)) {
         alert2("That file doesn't look like a hot-tub backup."); return;
       }
-      state = Object.assign(defaultState(), parsed);
-      saveState(state);
+      // Persist raw, then reload through loadState() so imports get the
+      // same defensive default-merging (e.g. new interval keys) as startup.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      state = loadState();
       go("today");
     } catch (e) { alert2("Could not read that file."); }
   };

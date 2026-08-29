@@ -42,7 +42,8 @@ const S = vm.runInContext(`({
   isHeavySoak, diagnose, canWeUseIt, overallStatus, waterAgeDays,
   currentCycleId, waterCycles, cycleSummary, trendDirection, floaterAdvice,
   detectPatterns, bromineMetrics, balanceScore, testingConsistency,
-  computeDose, findChemical, maintenanceStatus, cloudyWaterAdvice
+  computeDose, findChemical, maintenanceStatus, cloudyWaterAdvice,
+  freshFillBalanceStep
 })`, sandbox);
 
 /* ---------------- tiny test runner ---------------- */
@@ -382,6 +383,30 @@ test("Fresh fill active blocks use; startup states are the required sequence", (
   eq(S.canWeUseIt(st, NOW).verdict, "NOT_YET");
   eq(JSON.stringify(S.STARTUP_STATES),
      JSON.stringify(["refill", "initial_test", "alkalinity", "ph", "hardness", "bromine", "final_test", "complete"]));
+});
+
+test("High bromine during fresh fill: engine action carries doNotAdd", () => {
+  const actions = S.diagnose({ bromine: val(10) }, S.SPA_TARGETS, "fresh_fill");
+  ok(actions[0].doNotAdd, "do-not-add even in fresh-fill context");
+});
+
+test("Fresh-fill bromine step never says 'add granules' when bromine is high", () => {
+  const st = freshState();
+  st.startup = { active: true, state: "bromine" };
+  addTest(st, "2026-08-29T09:00:00", { bromine: val(10) }, "fresh_fill", "retest");
+  // The wizard screen builder is a pure string function over app state.
+  vm.runInContext("state = " + JSON.stringify(st), sandbox);
+  const highHtml = vm.runInContext('freshFillBalanceStep("bromine", new Date("2026-08-29T12:00:00"))', sandbox);
+  ok(/Do not add more sanitizer/i.test(highHtml), "warns not to add");
+  ok(!/I ADDED BROMINE GRANULES/.test(highHtml), "no add-granules button at 10+ ppm");
+  ok(/RETEST BROMINE/.test(highHtml), "offers retest");
+  // Low bromine still gets the establish-sanitizer flow.
+  const st2 = freshState();
+  st2.startup = { active: true, state: "bromine" };
+  addTest(st2, "2026-08-29T09:00:00", { bromine: val(0) }, "fresh_fill", "retest");
+  vm.runInContext("state = " + JSON.stringify(st2), sandbox);
+  const lowHtml = vm.runInContext('freshFillBalanceStep("bromine", new Date("2026-08-29T12:00:00"))', sandbox);
+  ok(/I ADDED BROMINE GRANULES/.test(lowHtml), "low bromine offers granules");
 });
 
 test("Shock cadence: due after 7 days, tracked from event", () => {
