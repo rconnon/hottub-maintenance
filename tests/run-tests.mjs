@@ -43,7 +43,8 @@ const S = vm.runInContext(`({
   currentCycleId, waterCycles, cycleSummary, trendDirection, floaterAdvice,
   detectPatterns, bromineMetrics, balanceScore, testingConsistency,
   computeDose, findChemical, maintenanceStatus, cloudyWaterAdvice,
-  freshFillBalanceStep, finalTestOutcome, tooltipHtml, startupInProgress
+  freshFillBalanceStep, finalTestOutcome, tooltipHtml, startupInProgress,
+  padSwatchHtml, testValuesHtml, PAD_COLORS
 })`, sandbox);
 
 /* ---------------- tiny test runner ---------------- */
@@ -456,6 +457,37 @@ test("Shock cadence: due after 7 days, tracked from event", () => {
   S.addEvent(st, "shock", {}, "", "2026-08-21T12:00:00");
   const m = S.maintenanceStatus(st, NOW);
   ok(m.shock.overdue, "8 days since shock → due");
+});
+
+
+console.log("\n== Result swatches ==");
+
+test("Exact readings show their single matched pad color", () => {
+  const html = S.padSwatchHtml("bromine", val(5), "hach_pool_spa_6way");
+  ok(html.includes(S.PAD_COLORS.bromine[5]), "bromine 5 bucket color used");
+  ok(html.includes("pad-swatch"), "renders the swatch span");
+});
+
+test("Between-two-colors readings show a split swatch of both buckets", () => {
+  const html = S.padSwatchHtml("alkalinity", range(80, 120), "hach_pool_spa_6way");
+  ok(html.includes("linear-gradient"), "split swatch");
+  ok(html.includes(S.PAD_COLORS.alkalinity[80]) && html.includes(S.PAD_COLORS.alkalinity[120]),
+     "both bucket colors present");
+});
+
+test("Readings with no matching bucket render no swatch", () => {
+  eq(S.padSwatchHtml("bromine", val(3), "hach_pool_spa_6way"), "", "3 ppm is not a strip bucket");
+  eq(S.padSwatchHtml("nope", val(5), "hach_pool_spa_6way"), "", "unknown parameter");
+});
+
+test("Timeline test chips carry swatches and escape text", () => {
+  const st = freshState();
+  const ev = addTest(st, "2026-08-29T09:00:00", { bromine: val(5), alkalinity: range(80, 120) });
+  vm.runInContext("state = " + JSON.stringify(st), sandbox);
+  const html = vm.runInContext("testValuesHtml(state.events[0])", sandbox);
+  ok(html.includes("reading-chip"), "chips rendered");
+  ok((html.match(/pad-swatch/g) || []).length === 2, "one swatch per reading");
+  ok(html.includes("Br 5"), "numbers remain canonical");
 });
 
 /* ---------------- summary ---------------- */
