@@ -43,7 +43,7 @@ const S = vm.runInContext(`({
   currentCycleId, waterCycles, cycleSummary, trendDirection, floaterAdvice,
   detectPatterns, bromineMetrics, balanceScore, testingConsistency,
   computeDose, findChemical, maintenanceStatus, cloudyWaterAdvice,
-  freshFillBalanceStep, finalTestOutcome, tooltipHtml
+  freshFillBalanceStep, finalTestOutcome, tooltipHtml, startupInProgress
 })`, sandbox);
 
 /* ---------------- tiny test runner ---------------- */
@@ -431,6 +431,24 @@ test("Chart tooltip escapes user-controlled event text (no XSS)", () => {
     context: "normal", age: "3 days", prev: 'Added <img src=x onerror=alert(1)> "chem"' });
   ok(!html.includes("<img"), "raw tag must not survive");
   ok(html.includes("&lt;img"), "tag is HTML-escaped");
+});
+
+test("Fresh-fill completion screen is reachable after an all-green final test", () => {
+  const st = freshState();
+  st.startup = { active: true, state: "final_test" };
+  st.maintenance.lastRefillDate = "2026-08-29T08:00:00";
+  addTest(st, "2026-08-29T09:00:00", { bromine: val(5), pH: val(7.2), alkalinity: val(80), hardness: val(250, true) }, "fresh_fill", "full");
+  vm.runInContext("state = " + JSON.stringify(st), sandbox);
+  vm.runInContext('setStartupState("complete")', sandbox);
+  const startup = vm.runInContext("state.startup", sandbox);
+  ok(startup.active, "wizard stays active at 'complete' so the screen renders");
+  const html = vm.runInContext("viewFreshFill()", sandbox);
+  ok(/Water setup complete/i.test(html), "completion banner shown");
+  ok(/START NORMAL MAINTENANCE/.test(html), "finish button offered (records startup_complete)");
+  // Verified-good water at the complete step must not block spa use.
+  ok(!vm.runInContext("startupInProgress(state)", sandbox), "complete step is not 'in progress'");
+  const r = vm.runInContext('canWeUseIt(state, new Date("2026-08-29T12:00:00"))', sandbox);
+  eq(r.verdict, "YES", "verified water is usable before tapping finish");
 });
 
 test("Shock cadence: due after 7 days, tracked from event", () => {
