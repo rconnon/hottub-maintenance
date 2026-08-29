@@ -318,13 +318,19 @@ const TEST_KITS = {
                    parameters: {}, padOrder: ["hardness", "bromine", "pH", "alkalinity"], instructions: {} }
 };
 
-// Approximate Hach chart pad colors — decorative hints only. The
-// number is always shown; color is never the sole channel.
+// Approximate Hach chart pad colors, matched to the actual Hach Pool &
+// Spa bottle chart (sampled from photos of Joel's bottle, Aug 2026):
+//   hardness: blue → purple → magenta-wine
+//   bromine (shared total-chlorine row): pale yellow → seafoam green
+//   pH: amber → orange → red-orange → crimson
+//   alkalinity: gold → olive → sage → teal → teal-blue
+// Decorative hints only — the number is always shown and color is never
+// the sole channel.
 const PAD_COLORS = {
-  hardness:   { 0:"#7ec8e3", 100:"#9db8d9", 250:"#8d9dcb", 500:"#7c72ad", 1000:"#6a4f96" },
-  bromine:    { 0:"#f6f0b9", 1:"#f3e396", 2:"#efd06f", 5:"#c88f3f", 10:"#a66a92", 20:"#7d4a86" },
-  pH:         { 6.2:"#f2b04e", 6.8:"#ec9a45", 7.2:"#e5813f", 7.8:"#d9603c", 8.4:"#c74a48" },
-  alkalinity: { 0:"#f0e27a", 40:"#cfd97a", 80:"#a8c973", 120:"#7cb46e", 180:"#4f9a68", 240:"#2c7e5f" }
+  hardness:   { 0:"#4a6cb4", 100:"#5f57a7", 250:"#6f4c9c", 500:"#7d3d8b", 1000:"#a52e6e" },
+  bromine:    { 0:"#f3ed9f", 1:"#eeeb9a", 2:"#e3e795", 5:"#a9dcae", 10:"#93d7b3", 20:"#82d2b9" },
+  pH:         { 6.2:"#e8a33d", 6.8:"#e88b34", 7.2:"#e2622f", 7.8:"#e04e3e", 8.4:"#d63a52" },
+  alkalinity: { 0:"#dcaf3c", 40:"#c3b84f", 80:"#93ab54", 120:"#83a878", 180:"#55998a", 240:"#4f8b9b" }
 };
 
 // Chemical inventory. Doses are NEVER hardcoded — a dose is only
