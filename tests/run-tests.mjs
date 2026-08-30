@@ -490,6 +490,13 @@ test("Timeline test chips carry swatches and escape text", () => {
   ok(html.includes("Br 5"), "numbers remain canonical");
 });
 
+
+test("Mobile zoom is locked (viewport + touch-action + iOS gesture guard)", () => {
+  ok(html.includes("maximum-scale=1") && html.includes("user-scalable=no"), "viewport disallows scaling");
+  ok(/touch-action: pan-y/.test(html), "touch-action blocks pinch while keeping scroll");
+  ok(html.includes("gesturestart"), "iOS gesture events prevented");
+});
+
 /* ---------------- summary ---------------- */
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
