@@ -145,11 +145,13 @@ svg { display: block; max-width: 100%; }
 /* ============ TILES (test entry) ============ */
 .tile-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
 .tile {
-  flex: 1 0 56px; min-height: 52px; border-radius: 12px;
+  flex: 1 0 56px; min-height: 68px; border-radius: 12px; padding: 6px 2px;
   border: 2px solid var(--hairline); background: var(--surface);
   font-size: 17px; font-weight: 650; position: relative;
 }
-.tile .tile-swatch { display: block; width: 22px; height: 6px; border-radius: 3px; margin: 4px auto 0; }
+/* Big enough to hold against the bottle chart: a full-width color bar. */
+.tile .tile-swatch { display: block; height: 16px; border-radius: 6px; margin: 6px 4px 0;
+  border: 1px solid var(--border); }
 .tile.sel { border-color: var(--accent); background: var(--info-bg); }
 .tile.dim { opacity: 0.35; }
 
@@ -1468,22 +1470,33 @@ function observationsPicker() {
         (f.observations[g[0]] === o ? "sel" : "") + '">' + o + "</button>").join("") + "</div></div>").join("") + "</details>";
 }
 
+// Seconds left on the strip hold timer, from WALL-CLOCK time since the
+// dip. Counting setInterval ticks drifts: iOS throttles timers when the
+// screen dims or Safari is backgrounded, so a tick-counted 15 s can run
+// long and the strip gets read late.
+function timerSecondsLeft(dippedAt, now, delaySeconds) {
+  return Math.max(0, Math.ceil(delaySeconds - (now - dippedAt) / 1000));
+}
+
 function startTimer() {
   const f = ui.testFlow;
+  f.dippedAt = Date.now();
   f.secondsLeft = f.kit.readDelaySeconds;
   f.step = "timer";
   render();
   const tick = setInterval(() => {
-    if (!ui.testFlow || ui.testFlow.step !== "timer") { clearInterval(tick); return; }
-    ui.testFlow.secondsLeft -= 1;
-    if (ui.testFlow.secondsLeft <= 0) {
+    // Bound to THIS flow: a cancelled or restarted test stops its timer.
+    if (ui.testFlow !== f || f.step !== "timer") { clearInterval(tick); return; }
+    const left = timerSecondsLeft(f.dippedAt, Date.now(), f.kit.readDelaySeconds);
+    if (left === f.secondsLeft) return; // re-render only when the shown second changes
+    f.secondsLeft = left;
+    if (left <= 0) {
       clearInterval(tick);
-      ui.testFlow.secondsLeft = 0;
       // Subtle completion cue — only if supported without extra permission.
       try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { /* ignore */ }
     }
     render();
-  }, 1000);
+  }, 250);
 }
 
 function saveTestFlow() {
