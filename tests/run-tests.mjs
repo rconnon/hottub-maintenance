@@ -44,7 +44,7 @@ const S = vm.runInContext(`({
   detectPatterns, bromineMetrics, balanceScore, testingConsistency,
   computeDose, findChemical, maintenanceStatus, cloudyWaterAdvice,
   freshFillBalanceStep, finalTestOutcome, tooltipHtml, startupInProgress,
-  padSwatchHtml, testValuesHtml, PAD_COLORS
+  padSwatchHtml, testValuesHtml, PAD_COLORS, timerSecondsLeft
 })`, sandbox);
 
 /* ---------------- tiny test runner ---------------- */
@@ -495,6 +495,23 @@ test("Mobile zoom is locked (viewport + touch-action + iOS gesture guard)", () =
   ok(html.includes("maximum-scale=1") && html.includes("user-scalable=no"), "viewport disallows scaling");
   ok(/touch-action: pan-y/.test(html), "touch-action blocks pinch while keeping scroll");
   ok(html.includes("gesturestart"), "iOS gesture events prevented");
+});
+
+test("Strip timer counts wall-clock time since the dip (no tick drift)", () => {
+  const t0 = 1000000;
+  eq(S.timerSecondsLeft(t0, t0, 15), 15, "at the dip");
+  eq(S.timerSecondsLeft(t0, t0 + 400, 15), 15, "partial second rounds up");
+  eq(S.timerSecondsLeft(t0, t0 + 1000, 15), 14, "one second in");
+  eq(S.timerSecondsLeft(t0, t0 + 14100, 15), 1, "last second");
+  eq(S.timerSecondsLeft(t0, t0 + 15000, 15), 0, "done");
+  // iOS may deliver no ticks for 20 s while the screen dims: the next
+  // tick must read 0, not 14.
+  eq(S.timerSecondsLeft(t0, t0 + 20000, 15), 0, "after a throttled gap");
+});
+
+test("Entry tiles show a full-width pad color bar", () => {
+  ok(/\.tile \.tile-swatch \{[^}]*height: 16px/.test(html), "swatch is a 16px bar");
+  ok(!/\.tile \.tile-swatch \{[^}]*width: 22px/.test(html), "old 22x6 chip is gone");
 });
 
 /* ---------------- summary ---------------- */
